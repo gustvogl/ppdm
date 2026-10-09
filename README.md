@@ -1,174 +1,192 @@
-# Nexo — PPDM2 · Atividade 10
+# Nexo 2 — seu próximo passo
 
-Base independente em **React + Supabase Auth**, preparada para a atividade de autenticação do 4º semestre, professor **Adriano Rosa Mazetto**. O CRUD de exemplo organiza tarefas pessoais. Como o código do aplicativo anterior não foi fornecido, este projeto não modifica nem substitui aquele aplicativo.
+Aplicativo pessoal de tarefas e projetos em **React + Supabase**, com interface em português para computador e celular. Preparado para a **Atividade 10 de PPDM2**, professor **Adriano Rosa Mazetto**. Esta é a evolução da base independente Nexo; o código do app anterior da disciplina não foi fornecido.
 
-## O que está implementado
+## O que funciona
 
-- Login com Google por `signInWithOAuth`, usando fluxo PKCE.
-- Cadastro por e-mail com `signUp` e login com `signInWithPassword`.
-- Sessão global com React Context, `getSession` e `onAuthStateChange`.
-- Restauração da sessão após recarregar a página e logout deste dispositivo.
-- Rota `/app` protegida e perfil com nome, e-mail e foto, quando disponíveis.
-- CRUD de tarefas: criar, listar, editar, concluir/reabrir e excluir.
-- Busca, filtro de status, prioridade, data opcional e indicadores de progresso.
-- SQL com RLS e permissões que limitam os registros ao dono.
-- Layout responsivo para computador e celular, navegação por teclado e respeito a movimento reduzido.
-- Testes de autenticação, validação e execução das políticas em PostgreSQL local.
+| Área         | Recursos                                                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Conta        | Google OAuth com PKCE, cadastro e login por e-mail, confirmação de conta, recuperação/troca de senha, edição do nome e logout          |
+| Sessão       | Context API, restauração ao abrir, escuta de eventos, rotas protegidas, tratamento de `PASSWORD_RECOVERY` e limpeza ao trocar de conta |
+| Tarefas      | Criar, editar, excluir, concluir/reabrir, três status, prioridade, prazo, projeto, etiquetas, checklist e favoritos                    |
+| Organização  | Lista paginada, quadro Kanban com arraste e seletor acessível, busca global, filtros e ordenação                                       |
+| Projetos     | CRUD, cor, descrição, progresso e tarefas vinculadas; excluir projeto preserva as tarefas                                              |
+| Calendário   | Navegação mensal, seleção de dia, agenda e criação de tarefa com prazo preenchido                                                      |
+| Progresso    | Conclusões dos últimos sete dias, distribuição por status, projeto e prioridade, indicadores de hoje e atraso                          |
+| Foco         | Timer de foco/pausa, seleção de tarefa, pausar, continuar e reiniciar                                                                  |
+| Preferências | Tema claro/escuro/sistema, lista compacta, prioridade padrão e duração do timer, separadas por conta neste navegador                   |
+| Dados        | Backup JSON, importação com confirmação, exportação CSV para planilhas e consultas sem truncamento no limite padrão da API             |
+| Celular      | Interface responsiva, navegação inferior, manifest, ícones, instalação PWA e cache somente dos arquivos estáticos                      |
+| Banco        | RLS por dono em tarefas e projetos, permissões explícitas, chave estrangeira que impede vincular tarefa a projeto alheio               |
 
-**Situação da entrega:** código preparado e validado localmente. Não há credenciais reais incluídas, projeto Supabase provisionado, login Google real comprovado, repositório publicado ou APK compilado. Os testes automatizados usam clientes simulados ou PostgreSQL local com usuários fictícios; não substituem as evidências reais exigidas pelo professor.
+**Situação:** código compilado e testado localmente. Sem credenciais reais incluídas, projeto Supabase provisionado, Google OAuth real comprovado, repositório publicado ou APK compilado. Os testes usam contas simuladas ou PostgreSQL local. Para usar o app com suas contas, execute a configuração abaixo. As evidências do professor precisam ser produzidas com o seu projeto real.
 
-## 1. Preparar o computador
+## Começar
 
-Instale **Node.js 24, versão 24.15.0 ou superior**, e use o terminal na pasta que contém `package.json`.
+Use **Node.js 24.15 ou superior**, preferencialmente Node 24, e abra o terminal na pasta de `package.json`.
 
 ```bash
 npm ci
 ```
 
-As versões estão fixadas no `package.json` e no `package-lock.json`. O ZIP contém os arquivos na raiz, sem uma pasta externa envolvendo o projeto.
-
-## 2. Preparar o Supabase
-
-1. Abra seu projeto em <https://supabase.com/dashboard>.
-2. Entre no **SQL Editor**, cole o conteúdo de `supabase/setup.sql` e execute.
-3. Se quiser conferir a estrutura, execute também `supabase/verify.sql`.
-4. Em configurações do projeto, copie a **Project URL** e uma chave **publishable**. Projetos legados também podem usar a **anon key**.
-5. Copie `.env.example` para `.env`, na mesma pasta de `package.json`, e preencha:
-
-No PowerShell do Windows, você pode criar a cópia com `Copy-Item .env.example .env`.
+1. Abra seu projeto no [Supabase Dashboard](https://supabase.com/dashboard).
+2. No **SQL Editor**, execute `supabase/setup.sql`. Ele cria/atualiza as tabelas próprias do Nexo. Também pode ser reaplicado na versão 1, preservando as tarefas.
+3. Copie `.env.example` para `.env` na raiz e preencha a URL do projeto e a chave pública **publishable**:
 
 ```env
 VITE_SUPABASE_URL=https://SEU_PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_SUA_CHAVE_PUBLICA
 ```
 
-Para anon key legada, use `VITE_SUPABASE_ANON_KEY` no lugar da variável publishable.
-
-O app exibe um aviso e mantém os botões de autenticação desativados enquanto faltar configuração. Ele não oferece um login fictício nem acesso local ao CRUD como alternativa.
-
-**Chaves no frontend:** URL e publishable/anon são credenciais públicas de cliente, protegidas pelas políticas do banco. As variáveis `VITE_` vão para o código entregue ao navegador. Por isso, não coloque nelas `service_role`, `sb_secret_`, senha de banco ou Client Secret do Google. `.env` está no `.gitignore`; `.env.example` contém apenas exemplos. O Client Secret do Google fica no painel do Supabase.
-
-## 3. Criar o cliente OAuth do Google
-
-1. Abra <https://console.cloud.google.com/> e selecione/crie o projeto da disciplina.
-2. Em **Google Auth Platform**, preencha **Branding** com nome do app e contatos. Em **Audience**, escolha **External/Externo**. Esses recursos também podem aparecer pelo menu antigo **APIs e Serviços → Tela de permissão OAuth**.
-3. Se o console solicitar contas de teste, inclua o e-mail que usará na apresentação. Para o perfil básico, mantenha apenas os escopos de identidade, e-mail e perfil.
-4. Em **Clients**, crie um cliente do tipo **Web application / Aplicativo da Web**.
-5. Configure as origens e o callback usando a tabela abaixo. Copie o callback exibido pelo provedor Google do seu projeto Supabase, sem modificar nada.
-6. Guarde o **Client ID** e o **Client Secret** para a próxima etapa.
-
-| Campo do Google               | Valor para desenvolvimento                             |
-| ----------------------------- | ------------------------------------------------------ |
-| Authorized JavaScript origins | `http://localhost:5173`                                |
-| Authorized redirect URIs      | `https://SEU_PROJECT_REF.supabase.co/auth/v1/callback` |
-
-O callback acima corresponde a um projeto hospedado no Supabase. Se o seu projeto usar domínio personalizado, use o callback exato apresentado no painel.
-
-## 4. Ativar Google no Supabase
-
-Em **Authentication → Sign In / Providers → Google**, habilite o provedor, informe Client ID e Client Secret e salve.
-
-Depois, em **Authentication → URL Configuration**, configure:
-
-| Campo do Supabase | Valor                    |
-| ----------------- | ------------------------ |
-| Site URL          | `http://localhost:5173`  |
-| Redirect URLs     | `http://localhost:5173/` |
-
-Existem dois retornos diferentes: o **Google volta para o callback do Supabase**; o **Supabase volta para a raiz do app**. `authReturnUrl()` produz essa raiz e a usa no login Google e na confirmação por e-mail. O SDK processa o código PKCE ao restaurar a sessão.
-
-Para a demonstração por e-mail, verifique também se o provedor **Email** e os cadastros estão habilitados. Se houver confirmação de e-mail, a conta só acessará o CRUD após confirmar e obter uma sessão.
-
-## 5. Executar e testar com sua conta
+No PowerShell: `Copy-Item .env.example .env`. Projetos legados podem usar `VITE_SUPABASE_ANON_KEY` em vez da publishable. Reinicie o servidor após editar as variáveis.
 
 ```bash
 npm run dev
 ```
 
-Abra **<http://localhost:5173>**. A porta é fixa: se estiver ocupada, encerre o outro servidor. O projeto não troca de porta silenciosamente, evitando divergências nos redirects.
+Abra [http://localhost:5173](http://localhost:5173). Se essa porta estiver ocupada, encerre o outro servidor; a porta não muda silenciosamente. Sem configuração, a tela mostra um aviso e desativa os botões de autenticação. O app não cria uma sessão fictícia como alternativa.
 
-1. Clique em **Entrar com Google**, escolha sua conta e conclua o consentimento.
-2. Após o retorno, abra **Meu perfil**: confira nome, e-mail e foto disponível.
-3. Crie uma tarefa, edite, conclua, reabra e exclua uma tarefa de teste.
-4. Recarregue a página: a sessão deve continuar ativa.
-5. Saia da conta e tente abrir `/app`: deve retornar ao login.
-6. Entre com uma segunda conta: a lista deve ser independente.
-7. No painel Supabase, abra **Authentication → Users** e confira o usuário criado.
+## Google Cloud Console em português
 
-O SDK guarda a sessão no armazenamento do navegador. Use **Sair da conta** em um computador compartilhado. O logout implementado usa `scope: 'local'`, encerrando esta sessão sem desconectar outros dispositivos.
+1. Entre no [Google Cloud Console](https://console.cloud.google.com/) e crie/selecione um projeto.
+2. Abra **Menu ☰ → Plataforma de autenticação do Google**. No primeiro acesso, clique em **Começar**.
+3. Em **Branding / Informações da marca**, informe nome do app, e-mail de suporte e contato. Em **Público-alvo**, escolha **Externo**. Se solicitado, adicione sua conta em **Usuários de teste**.
+4. Em **Clientes → Criar cliente**, escolha **Aplicativo da Web** e nomeie como `Nexo Web`.
+5. Preencha os valores abaixo. O painel também pode apresentar os menus antigos **APIs e Serviços → Tela de permissão OAuth / Credenciais**.
 
-Os dados exibidos em `user_metadata` servem apenas para apresentação do perfil. A autorização no banco usa o identificador autenticado (`auth.uid()`), nunca o nome ou outro campo editável de perfil.
+| Campo                                | Valor local                                            |
+| ------------------------------------ | ------------------------------------------------------ |
+| Origens JavaScript autorizadas       | `http://localhost:5173`                                |
+| URIs de redirecionamento autorizados | `https://SEU_PROJECT_REF.supabase.co/auth/v1/callback` |
 
-## 6. Compilar e verificar
+Copie **o callback exato apresentado no provedor Google do Supabase**, especialmente se usar um domínio personalizado. Não coloque `localhost` no lugar do callback do Supabase.
+
+Guarde o **ID do cliente** e a **Chave secreta do cliente** para o painel do Supabase. Mantenha os escopos de identidade, e-mail e perfil necessários ao login.
+
+## Supabase Auth
+
+Em **Authentication → Sign In / Providers → Google**, habilite o provedor e preencha o ID e o segredo do cliente Google. Salve.
+
+Em **Authentication → URL Configuration**, configure:
+
+| Campo                                | Valor                                   |
+| ------------------------------------ | --------------------------------------- |
+| Site URL                             | `http://localhost:5173`                 |
+| Redirect URLs — login/confirmação    | `http://localhost:5173/`                |
+| Redirect URLs — recuperação de senha | `http://localhost:5173/redefinir-senha` |
+
+O **Google retorna ao callback do Supabase**. O **Supabase retorna ao endereço do app**. O SDK processa o código PKCE antes do redirecionamento interno. Links de confirmação e recuperação devem ser abertos no mesmo navegador em que o fluxo começou, por causa do verificador PKCE.
+
+Verifique também o provedor **Email**, a permissão de novos cadastros e a confirmação de e-mail. O app nunca trata um cadastro sem sessão como um usuário logado. Para envio de e-mails em produção, configure o SMTP e os limites adequados no projeto. Falhas e limites são apresentados na interface.
+
+## Usar o aplicativo
+
+- **Visão geral:** progresso, tarefas em aberto, prazos de hoje e atrasos. Clique em um indicador para abrir a lista filtrada.
+- **Minhas tarefas:** crie/edite tarefas, passos do checklist, etiquetas e favoritos. Troque entre lista e quadro. No computador, arraste cartões; no celular e teclado, use o seletor de status.
+- **Projetos:** reúna tarefas em objetivos. Excluir um projeto exige confirmação e deixa suas tarefas sem projeto.
+- **Calendário:** selecione um dia e use **Tarefa neste dia** para preencher o prazo.
+- **Meu progresso:** os gráficos usam registros atuais. Excluir uma tarefa remove sua contribuição; não são um histórico de auditoria. Conclusões anteriores sem data conhecida não entram no gráfico semanal.
+- **Modo foco:** o timer continua durante a navegação interna enquanto o app estiver aberto. Ao terminar, mostra um aviso dentro do app. Fechar o app ou sair da conta encerra o timer e sua contagem de blocos. Uma alteração de duração nas configurações reinicia o timer.
+- **Meu perfil:** mostra dados reais da sessão, permite editar o nome, alterar a senha e sair deste dispositivo. A foto aparece quando fornecida pelo Google.
+- **Configurações:** preferências deste navegador, instalação, CSV e backup.
+- **Lembretes:** o sino lista tarefas atrasadas e previstas para hoje dentro do aplicativo. Não envia push, SMS ou e-mails de lembrete.
+
+Atalhos: **Ctrl/⌘ + K** busca tarefas, **N** cria uma tarefa quando nenhum campo ou janela está em edição, e **Esc** fecha a janela. As rotas das telas são preservadas ao recarregar e podem ser acessadas diretamente após entrar.
+
+Os dados são carregados ao entrar, ao atualizar manualmente, ao voltar a focar a janela e ao reconectar. Não há edição offline ou sincronização por WebSocket nesta versão. Enquanto desconectado, o app informa a situação e impede novas ações de gravação pela interface.
+
+### Backup e importação
+
+O JSON leva projetos, tarefas e seus campos, sem IDs de conta, tokens ou senhas. Os vínculos de projeto são remapeados para registros pertencentes à conta que importa. CSV escapa textos e neutraliza inícios de fórmula para abrir em planilhas.
+
+A importação **adiciona cópias**, mantendo os registros atuais; não substitui a conta nem conserva os timestamps originais. Conclusões importadas recebem a data da importação. Importar duas vezes cria registros repetidos. Limites: arquivo de até 5 MB, até 100 projetos e 1.000 tarefas por importação. Em caso de interrupção, o app informa quantos registros já foram adicionados; a operação não é uma transação única. Não importe o mesmo arquivo novamente sem considerar as cópias.
+
+## Instalar no celular e publicar
+
+Compile:
 
 ```bash
-npm test
 npm run build
 npm run preview
 ```
 
-O build gera `dist/`. O preview usa <http://localhost:4173>; para testar OAuth nele, adicione também essa origem e `http://localhost:4173/` à configuração correspondente. Para a entrega local, prefira o servidor da porta 5173.
+O build gera `dist/`, o manifest e um service worker com os arquivos estáticos da versão. A instalação é de uma **PWA**, pelo navegador. Não é um APK nem uma publicação nas lojas.
 
-O conjunto de testes cobre rotas, restauração da sessão, eventos de login/logout, erros de credenciais, confirmação de senha/e-mail, validações e políticas SQL. Os testes do banco usam PGlite (PostgreSQL em WASM), com dois usuários fictícios. Leia `docs/VALIDACAO.md` para entender o alcance da verificação.
+1. Hospede `dist/` com HTTPS e fallback de rotas para `index.html`. `vercel.json` já inclui essa configuração para Vercel.
+2. Configure as duas variáveis públicas no ambiente de build da hospedagem e gere um novo build.
+3. No Google, adicione a origem `https://SEU_DOMINIO`.
+4. No Supabase, defina a Site URL pública e adicione os retornos exatos `https://SEU_DOMINIO/` e `https://SEU_DOMINIO/redefinir-senha`.
+5. Teste o Google, a recuperação e o CRUD no domínio publicado.
+6. No Android, use **Instalar aplicativo** no menu do navegador ou o botão em Configurações quando disponível. No iPhone, Safari → Compartilhar → Adicionar à Tela de Início. A opção depende do navegador.
 
-## 7. Enviar ao GitHub e ao professor
+O preview usa [http://localhost:4173](http://localhost:4173). Para testar Auth nessa porta, autorize também essa origem no Google e ambos os retornos correspondentes no Supabase.
 
-Crie um repositório na sua conta e envie o código, incluindo `.env.example`, `package.json`, `package-lock.json`, `src/`, `public/`, `supabase/`, `tests/` e `docs/`. Não envie `.env`, `node_modules/` ou `dist/`.
+O service worker guarda somente a interface, ícones e arquivos do build. Não guarda respostas da API, credenciais ou URLs de retorno OAuth no Cache Storage. A sessão persistente continua sendo gerenciada pelo SDK no armazenamento do navegador. É necessário internet para entrar e consultar/salvar dados. Uma atualização do cache aguarda fechar as janelas antigas antes de ativar o novo build.
 
-Se preferir Git pelo terminal, substitua a URL abaixo pela URL do repositório que você criou:
+## Segurança dos dados
+
+As tabelas `ppdm2_tasks` e `ppdm2_projects` têm RLS e quatro políticas por dono. Todas as operações usam o usuário autenticado. A chave estrangeira `(user_id, project_id)` impede vincular uma tarefa ao projeto de outra conta. O SQL Editor é administrador e não comprova o isolamento do usuário final; teste com duas contas reais.
+
+URL e publishable/anon são públicas. **Toda variável `VITE_` vai para o navegador.** Não coloque `service_role`, `sb_secret_`, senha de banco ou Client Secret do Google no frontend. O segredo Google fica apenas no painel do Supabase. `.env` é ignorado pelo Git; `.env.example` contém exemplos. Nome e foto em `user_metadata` são apresentação, nunca autorização.
+
+## Verificar e entregar
+
+```bash
+npm test
+npm run build
+```
+
+Leia `docs/VALIDACAO.md` para o alcance dos testes e `docs/ENTREGA.md` para as evidências reais exigidas. `supabase/verify.sql` faz o diagnóstico estrutural somente leitura.
+
+Crie um repositório GitHub, substitua a URL abaixo pela sua e envie:
 
 ```bash
 git init -b main
 git add .
-git commit -m "Implementa Supabase Auth e CRUD protegido"
+git commit -m "Implementa Nexo com Supabase Auth e projetos protegidos"
 git remote add origin https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
 git push -u origin main
 ```
 
-Envie ao professor **o link do repositório e as evidências reais** listadas em `docs/ENTREGA.md`. O ZIP sozinho não atende ao critério do link GitHub.
+Não envie `.env`, `node_modules` ou `dist`. O professor precisa do **link do repositório e prints/gravação do Google funcionando e do usuário registrado no Supabase**, além do código. O ZIP sozinho não atende ao critério de entrega.
 
-## Publicação web opcional
+## Estrutura principal
 
-O `vercel.json` contém fallback das rotas para a SPA. Em uma hospedagem compatível, use `npm ci`, build `npm run build` e saída `dist`; configure as duas variáveis públicas no ambiente de build. Após publicar, cadastre a origem pública no Google e o retorno exato `https://SEU_DOMINIO/` no Supabase. Defina a Site URL pública e faça um novo teste real.
+| Arquivos                                                                 | Responsabilidade                                          |
+| ------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `src/context/AuthContext.jsx`                                            | Login, cadastro, sessão, recuperação, perfil e logout     |
+| `src/App.jsx`, `src/components/ProtectedRoute.jsx`                       | Retornos PKCE e proteção de todas as telas internas       |
+| `src/pages/Workspace.jsx`                                                | Navegação, painel e integração das operações              |
+| `src/components/`                                                        | Formulários, calendário, relatórios, foco e configurações |
+| `src/lib/tasks.js`, `projects.js`, `readRows.js`                         | Operações do banco e paginação da leitura                 |
+| `src/lib/backup.js`                                                      | Exportação, validação e leitura do backup                 |
+| `src/hooks/useWorkspaceData.js`                                          | Estado por conta e atualização dos dados                  |
+| `src/hooks/usePreferences.js`                                            | Preferências locais e tema                                |
+| `supabase/setup.sql`                                                     | Esquema, atualização da versão 1, índices, triggers e RLS |
+| `public/manifest.webmanifest`, `pwa/service-worker.js`, `vite.config.js` | Instalação e cache estático gerado no build               |
 
-Este projeto tem interface móvel no navegador. **Não contém integração nativa de retorno OAuth para Capacitor nem um APK**. Para um app Android empacotado, o retorno por deep link precisa ser implementado e testado no aplicativo nativo.
-
-## Onde cada requisito aparece
-
-| Requisito                                | Arquivo principal                                  |
-| ---------------------------------------- | -------------------------------------------------- |
-| Cliente do Supabase e PKCE               | `src/lib/supabaseClient.js`                        |
-| Google, cadastro, login, sessão e logout | `src/context/AuthContext.jsx`                      |
-| Interfaces de cadastro e login           | `src/pages/AuthPage.jsx`                           |
-| Redirecionamento e rotas protegidas      | `src/App.jsx`, `src/components/ProtectedRoute.jsx` |
-| Perfil e telas internas                  | `src/pages/Workspace.jsx`                          |
-| Operações do CRUD                        | `src/lib/tasks.js`, `src/hooks/useTasks.js`        |
-| RLS e permissões por proprietário        | `supabase/setup.sql`                               |
-| Roteiro de evidências                    | `docs/ENTREGA.md`                                  |
-
-Para integrar a autenticação ao CRUD do seu app anterior, siga `docs/INTEGRAR_NO_SEU_APP.md`.
+Para adaptar a autenticação ao seu CRUD anterior, consulte `docs/INTEGRAR_NO_SEU_APP.md`.
 
 ## Problemas comuns
 
-| Problema                           | Verificação                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `redirect_uri_mismatch`            | O callback autorizado no Google precisa coincidir exatamente com o callback do Supabase.               |
-| Google está desativado             | Confira provedor habilitado, Client ID e Client Secret no Supabase.                                    |
-| Retorno para o endereço errado     | Confira Site URL e o retorno completo com a barra final na lista de Redirect URLs.                     |
-| Conta bloqueada no Google          | Confira Audience, estado do aplicativo e usuários de teste solicitados pelo console.                   |
-| Senha correta, mas login negado    | Verifique a confirmação de e-mail.                                                                     |
-| Confirmação de e-mail não chega    | Confira spam, limites e configuração de envio do projeto; login Google pode ser testado separadamente. |
-| Tabela não encontrada / `PGRST205` | Execute `supabase/setup.sql` no mesmo projeto apontado pelo `.env`.                                    |
-| `permission denied` / `42501`      | Confira os GRANTs e as quatro políticas. Não desative RLS para contornar o erro.                       |
-| `.env` alterado, mas app igual     | Reinicie o Vite; em produção, gere outro build.                                                        |
+| Problema                                   | Conferir                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------ |
+| `redirect_uri_mismatch`                    | Callback Google idêntico ao apresentado pelo Supabase                          |
+| Conta Google bloqueada                     | Público-alvo, estado e usuários de teste solicitados pelo console              |
+| Recuperação volta para lugar errado        | Autorizar o retorno completo `/redefinir-senha` e conferir templates de e-mail |
+| Link expirado ou aberto em outro navegador | Solicitar novo link no mesmo navegador e abri-lo nele                          |
+| Tabela/campo não encontrado                | Executar o `supabase/setup.sql` da versão 2 no mesmo projeto do `.env`         |
+| `permission denied` / `42501`              | GRANTs e políticas; manter RLS ativada                                         |
+| E-mail não chega                           | Spam, SMTP, limites e confirmação do projeto                                   |
+| App não instala                            | HTTPS, build publicado, manifest/ícones e suporte do navegador                 |
+| Alteração de `.env` não aparece            | Reiniciar Vite ou gerar novo build de produção                                 |
 
-## Documentação oficial consultada
+## Referências oficiais
 
-- Supabase, Google: <https://supabase.com/docs/guides/auth/social-login/auth-google>
-- Supabase, redirects: <https://supabase.com/docs/guides/auth/redirect-urls>
-- Supabase, eventos da sessão: <https://supabase.com/docs/reference/javascript/auth-onauthstatechange>
-- Supabase, RLS: <https://supabase.com/docs/guides/database/postgres/row-level-security>
-- Supabase, permissões explícitas de tabelas: <https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically>
-- Google, clientes OAuth: <https://support.google.com/cloud/answer/15549257>
-
-Preparado em 09/10/2026. A entrega escolar informada tem prazo às **16h** nesse dia, horário de São Paulo.
+- [Google OAuth com Supabase](https://supabase.com/docs/guides/auth/social-login/auth-google)
+- [Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)
+- [Recuperação de senha](https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail)
+- [Eventos de autenticação](https://supabase.com/docs/reference/javascript/auth-onauthstatechange)
+- [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Clientes OAuth Google](https://support.google.com/cloud/answer/15549257)
+- [Instalação PWA](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)

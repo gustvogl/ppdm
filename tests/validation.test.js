@@ -48,6 +48,10 @@ describe("validação das tarefas", () => {
         status: "pending",
         priority: "medium",
         due_date: null,
+        project_id: null,
+        tags: [],
+        checklist: [],
+        pinned: false,
       },
     );
   });

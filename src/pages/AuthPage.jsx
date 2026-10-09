@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authErrorMessage } from "../lib/errors.js";
 import Brand from "../components/Brand.jsx";
@@ -45,9 +45,9 @@ function PasswordField({
   );
 }
 
-function readOAuthError() {
-  const query = new URLSearchParams(window.location.search);
-  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+function readOAuthError(search, hash) {
+  const query = new URLSearchParams(search);
+  const fragment = new URLSearchParams(hash.replace(/^#/, ""));
   const code = query.get("error") || fragment.get("error");
   if (!code) return "";
   return code === "access_denied"
@@ -56,6 +56,7 @@ function readOAuthError() {
 }
 
 export default function AuthPage({ mode }) {
+  const location = useLocation();
   const isSignup = mode === "signup";
   const {
     signIn,
@@ -70,7 +71,9 @@ export default function AuthPage({ mode }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [pending, setPending] = useState("");
-  const [error, setError] = useState(readOAuthError);
+  const [error, setError] = useState(() =>
+    readOAuthError(location.search, location.hash),
+  );
   const [confirmation, setConfirmation] = useState(false);
 
   async function handleSubmit(event) {
@@ -283,6 +286,11 @@ export default function AuthPage({ mode }) {
                   autoComplete={isSignup ? "new-password" : "current-password"}
                   minLength={isSignup ? 8 : undefined}
                 />
+                {!isSignup && (
+                  <Link className="forgot-link" to="/recuperar-senha">
+                    Esqueci minha senha
+                  </Link>
+                )}
                 {isSignup && (
                   <>
                     <small className="field-hint">

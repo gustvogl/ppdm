@@ -8,6 +8,18 @@ export function authErrorMessage(error) {
     return "Este e-mail já tem uma conta. Tente entrar.";
   if (code === "weak_password")
     return "Escolha uma senha mais forte para sua conta.";
+  if (code === "same_password") return "Escolha uma senha diferente da atual.";
+  if (
+    code === "reauthentication_needed" ||
+    code === "reauthentication_not_valid"
+  )
+    return "Entre novamente na sua conta antes de alterar a senha.";
+  if (
+    code === "otp_expired" ||
+    code === "flow_state_expired" ||
+    code === "flow_state_not_found"
+  )
+    return "Este link expirou ou foi aberto em outro navegador. Solicite um novo link e abra no mesmo navegador.";
   if (code === "signup_disabled")
     return "Novos cadastros estão desativados neste aplicativo.";
   if (
@@ -23,6 +35,10 @@ export function authErrorMessage(error) {
 }
 
 export function taskErrorMessage(error) {
+  if (error?.code === "42703" || error?.code === "PGRST204")
+    return "Atualize o banco executando o arquivo supabase/setup.sql da versão 2.";
+  if (error?.code === "23503")
+    return "O projeto selecionado não está mais disponível. Atualize os dados e escolha outro projeto.";
   if (error?.code === "42P01" || error?.code === "PGRST205")
     return "O espaço de tarefas ainda não está disponível. Confira a configuração do banco.";
   if (error?.code === "42501")

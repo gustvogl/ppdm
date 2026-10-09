@@ -8,7 +8,7 @@ Esta base é independente porque o código do aplicativo original não foi forne
 4. Adapte `AuthPage` ao seu design. Preserve as chamadas `signInWithGoogle`, `signIn`, `signUp` e `signOut`.
 5. Proteja as rotas internas com `ProtectedRoute` ou uma condição equivalente. Enquanto `loading` for verdadeiro, mostre a tela de carregamento.
 6. No CRUD, use `user.id` como dono dos novos registros e como filtro das consultas.
-7. Configure RLS na sua própria tabela, com SELECT, INSERT, UPDATE e DELETE por proprietário. O arquivo `setup.sql` desta base cria somente `ppdm2_tasks`; ele não altera automaticamente a tabela antiga.
+7. Configure RLS na sua própria tabela, com SELECT, INSERT, UPDATE e DELETE por proprietário. O arquivo `setup.sql` desta base cria `ppdm2_tasks` e `ppdm2_projects`; ele não altera automaticamente a tabela antiga.
 8. Planeje a atribuição dos registros antigos ao dono correto antes de tornar `user_id` obrigatório. Não atribua registros de outras pessoas ao primeiro usuário que entrar. Para dados compartilhados, use políticas específicas desse modelo.
 9. Ao sair ou trocar de conta, limpe o estado do CRUD. Nesta base, `Workspace` recebe `key={user.id}` e é desmontado quando não há usuário.
 10. Configure callbacks e redirects para o endereço real do aplicativo e teste com duas contas.

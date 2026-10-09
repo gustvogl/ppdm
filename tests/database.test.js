@@ -30,7 +30,9 @@ beforeAll(async () => {
   await db.exec(setup);
 }, 30000);
 beforeEach(async () => {
-  await db.exec("reset role; truncate public.ppdm2_tasks");
+  await db.exec(
+    "reset role; truncate public.ppdm2_tasks, public.ppdm2_projects",
+  );
   await db.query(
     "insert into public.ppdm2_tasks(id,user_id,title) values ($1,$2,'Tarefa de A'),($3,$4,'Tarefa de B')",
     [ta, a, tb, b],
@@ -41,6 +43,84 @@ afterAll(async () => {
 });
 
 describe("RLS e permissões executadas em PostgreSQL local", () => {
+  it("protege projetos e impede associar tarefa a projeto de outra conta", async () => {
+    await db.query(
+      "insert into public.ppdm2_projects(id,user_id,name) values ($1,$2,'Projeto de B')",
+      [tb, b],
+    );
+    await asUser(a);
+    expect(
+      (await db.query("select * from public.ppdm2_projects")).rows,
+    ).toEqual([]);
+    await expect(
+      db.query(
+        "insert into public.ppdm2_projects(user_id,name) values ($1,'Invasão')",
+        [b],
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      db.query("update public.ppdm2_tasks set project_id=$1 where id=$2", [
+        tb,
+        ta,
+      ]),
+    ).rejects.toMatchObject({ code: "23503" });
+    expect(
+      (
+        await db.query(
+          "delete from public.ppdm2_projects where id=$1 returning id",
+          [tb],
+        )
+      ).rows,
+    ).toEqual([]);
+  });
+  it("excluir um projeto próprio mantém as tarefas sem vínculo", async () => {
+    await asUser(a);
+    await db.query(
+      "insert into public.ppdm2_projects(id,user_id,name) values ($1,$2,'Projeto de A')",
+      [ta, a],
+    );
+    await db.query("update public.ppdm2_tasks set project_id=$1 where id=$2", [
+      ta,
+      ta,
+    ]);
+    await db.query("delete from public.ppdm2_projects where id=$1", [ta]);
+    expect(
+      (
+        await db.query(
+          "select project_id from public.ppdm2_tasks where id=$1",
+          [ta],
+        )
+      ).rows,
+    ).toEqual([{ project_id: null }]);
+  });
+  it("protege timestamps de conclusão e valida checklist no banco", async () => {
+    await asUser(a);
+    const result = await db.query(
+      "update public.ppdm2_tasks set status='done',completed_at='2000-01-01' where id=$1 returning completed_at",
+      [ta],
+    );
+    expect(new Date(result.rows[0].completed_at).getFullYear()).toBeGreaterThan(
+      2000,
+    );
+    await db.query(
+      "update public.ppdm2_tasks set status='pending' where id=$1",
+      [ta],
+    );
+    expect(
+      (
+        await db.query(
+          "select completed_at from public.ppdm2_tasks where id=$1",
+          [ta],
+        )
+      ).rows[0].completed_at,
+    ).toBeNull();
+    await expect(
+      db.query(
+        'update public.ppdm2_tasks set checklist=\'[{"text":"Passo","done":"sim"}]\' where id=$1',
+        [ta],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
+  });
   it("bloqueia consultas sem autenticação", async () => {
     await db.exec("set role anon");
     await expect(

@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
     signInWithPassword: vi.fn(),
     signUp: vi.fn(),
     signOut: vi.fn(),
+    resetPasswordForEmail: vi.fn(),
+    updateUser: vi.fn(),
   },
   unsubscribe: vi.fn(),
   listener: null,
@@ -19,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../src/lib/supabaseClient.js", () => ({
   supabase: { auth: mocks.auth },
   configurationError: null,
-  authReturnUrl: () => "http://localhost:5173/",
+  authReturnUrl: (path = "/") => `http://localhost:5173${path}`,
 }));
 
 vi.mock("../src/pages/Workspace.jsx", async () => {
@@ -82,6 +84,11 @@ beforeEach(() => {
     error: null,
   });
   mocks.auth.signOut.mockResolvedValue({ error: null });
+  mocks.auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+  mocks.auth.updateUser.mockResolvedValue({
+    data: { user: session.user },
+    error: null,
+  });
 });
 
 describe("sessão e rotas", () => {
@@ -289,4 +296,75 @@ it("uma falha de logout mantém a sessão; o logout concluído limpa o usuário"
     expect(screen.getByText("Visitante")).toBeInTheDocument(),
   );
   expect(mocks.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+});
+
+describe("recuperação de acesso", () => {
+  it("solicita um link autorizado e usa resposta genérica", async () => {
+    boot("/recuperar-senha");
+    const user = userEvent.setup();
+    await user.type(
+      await screen.findByLabelText("E-mail"),
+      "aluno@example.com",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Enviar link de recuperação" }),
+    );
+    expect(mocks.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      "aluno@example.com",
+      { redirectTo: "http://localhost:5173/redefinir-senha" },
+    );
+    expect(await screen.findByText(/Se houver uma conta/)).toBeInTheDocument();
+  });
+  it("PASSWORD_RECOVERY abre a troca de senha antes do CRUD", async () => {
+    boot("/app");
+    await screen.findByRole("button", { name: "Entrar com Google" });
+    act(() => mocks.listener("PASSWORD_RECOVERY", session));
+    expect(await screen.findByLabelText("Nova senha")).toBeInTheDocument();
+    expect(screen.queryByText(/CRUD protegido/)).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText("Nova senha", { exact: true }),
+      "nova-senha-123",
+    );
+    await user.type(
+      screen.getByLabelText("Confirmar nova senha"),
+      "nova-senha-123",
+    );
+    await user.click(screen.getByRole("button", { name: "Salvar nova senha" }));
+    expect(mocks.auth.updateUser).toHaveBeenCalledWith({
+      password: "nova-senha-123",
+    });
+    expect(await screen.findByText("Senha atualizada.")).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "Ir para meu espaço" }));
+    expect(await screen.findByText(/CRUD protegido/)).toBeInTheDocument();
+  });
+  it("um visitante não consegue atualizar a senha sem uma sessão", async () => {
+    boot("/redefinir-senha");
+    expect(
+      await screen.findByRole("link", { name: "Solicitar um novo link" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nova senha")).not.toBeInTheDocument();
+    expect(mocks.auth.updateUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("retorno OAuth", () => {
+  it("mantém o retorno inicial aguardando a troca da sessão", async () => {
+    const pending = deferred();
+    mocks.auth.getSession.mockReturnValue(pending.promise);
+    boot("/?code=ficticio");
+    expect(screen.getByText("Preparando seu espaço…")).toBeInTheDocument();
+    expect(screen.queryByText(/CRUD protegido/)).not.toBeInTheDocument();
+    await act(async () => pending.resolve({ data: { session }, error: null }));
+    expect(await screen.findByText(/CRUD protegido/)).toBeInTheDocument();
+  });
+  it("preserva o erro de consentimento na chegada ao login", async () => {
+    boot("/?error=access_denied");
+    expect(
+      await screen.findByRole("button", { name: "Entrar com Google" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Você cancelou a entrada pelo Google",
+    );
+  });
 });

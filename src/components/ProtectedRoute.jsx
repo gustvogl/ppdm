@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import LoadingScreen from "./LoadingScreen.jsx";
 
 export default function ProtectedRoute() {
-  const { user, loading, sessionError } = useAuth();
+  const { user, loading, sessionError, recovering } = useAuth();
   const location = useLocation();
   if (loading) return <LoadingScreen />;
   if (sessionError)
@@ -21,5 +21,6 @@ export default function ProtectedRoute() {
     );
   if (!user)
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (recovering) return <Navigate to="/redefinir-senha" replace />;
   return <Outlet />;
 }

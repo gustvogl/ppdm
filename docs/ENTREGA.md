@@ -16,6 +16,8 @@ Prazo informado: **09/10/2026, às 16h (São Paulo)**.
 | `02-perfil-logado.png`  | Após o consentimento, tela **Meu perfil** com nome, e-mail ou foto da conta real.        |
 | `03-supabase-users.png` | **Authentication → Users** no seu projeto Supabase, mostrando o registro correspondente. |
 
+No celular, abra **Mais → Meu perfil** para mostrar a conta.
+
 Na captura do painel, deixe visível apenas o necessário para identificar sua conta. Feche páginas com chaves, segredos ou dados de outras pessoas. Não use prints de clientes simulados como comprovação de OAuth real.
 
 ## Gravação sugerida — 60 a 90 segundos
@@ -30,7 +32,7 @@ Na captura do painel, deixe visível apenas o necessário para identificar sua c
 
 ## Teste adicional de isolamento
 
-Use duas contas diferentes. Crie uma tarefa na conta A, saia e entre com B. A tarefa de A não deve aparecer. Ao sair de B e voltar à conta A, a tarefa deve continuar disponível. O SQL Editor executa como administrador e pode ver todas as linhas; ele não serve como teste de isolamento do usuário final.
+Use duas contas diferentes. Crie uma tarefa na conta A, saia e entre com B. A tarefa de A não deve aparecer. Ao sair de B e voltar à conta A, a tarefa deve continuar disponível. Confira também que os projetos são independentes e que excluir um projeto mantém suas tarefas. O SQL Editor executa como administrador e pode ver todas as linhas; ele não serve como teste de isolamento do usuário final.
 
 ## Antes de enviar
 

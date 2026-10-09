@@ -20,6 +20,6 @@ export const supabase = configurationError
     });
 
 // Retorno do OAuth e da confirmação por e-mail para a raiz deste app.
-export function authReturnUrl() {
-  return new URL("/", window.location.origin).href;
+export function authReturnUrl(path = "/") {
+  return new URL(path, window.location.origin).href;
 }

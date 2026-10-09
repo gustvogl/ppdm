@@ -19,6 +19,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState("");
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -30,10 +31,12 @@ export function AuthProvider({ children }) {
     // O callback é síncrono: não executar consultas/await aqui para evitar deadlocks.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return;
       revision += 1;
       setSession(nextSession);
+      if (event === "PASSWORD_RECOVERY") setRecovering(true);
+      if (event === "SIGNED_OUT") setRecovering(false);
       setSessionError("");
       setLoading(false);
     });
@@ -109,8 +112,43 @@ export function AuthProvider({ children }) {
     const { error } = await requireClient().auth.signOut({ scope: "local" });
     if (error) throw error;
     setSession(null);
+    setRecovering(false);
     setSessionError("");
   }, [requireClient]);
+
+  const requestPasswordReset = useCallback(
+    async (email) => {
+      const { error } = await requireClient().auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo: authReturnUrl("/redefinir-senha") },
+      );
+      if (error) throw error;
+    },
+    [requireClient],
+  );
+  const updatePassword = useCallback(
+    async (password) => {
+      const { error } = await requireClient().auth.updateUser({ password });
+      if (error) throw error;
+      setRecovering(false);
+    },
+    [requireClient],
+  );
+  const updateProfile = useCallback(
+    async (fullName) => {
+      const name = fullName.trim();
+      if (name.length < 2 || name.length > 80)
+        throw new Error("Use um nome de 2 a 80 caracteres.");
+      const { data, error } = await requireClient().auth.updateUser({
+        data: { full_name: name },
+      });
+      if (error) throw error;
+      setSession((current) =>
+        current ? { ...current, user: data.user } : current,
+      );
+    },
+    [requireClient],
+  );
 
   const value = useMemo(
     () => ({
@@ -124,8 +162,24 @@ export function AuthProvider({ children }) {
       signIn,
       signUp,
       signOut,
+      recovering,
+      requestPasswordReset,
+      updatePassword,
+      updateProfile,
     }),
-    [session, loading, sessionError, signInWithGoogle, signIn, signUp, signOut],
+    [
+      session,
+      loading,
+      sessionError,
+      signInWithGoogle,
+      signIn,
+      signUp,
+      signOut,
+      recovering,
+      requestPasswordReset,
+      updatePassword,
+      updateProfile,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
